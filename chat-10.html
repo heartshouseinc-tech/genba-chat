@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1565C0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="現場チャット">
+<link rel="manifest" href="chat-manifest.json">
+<title>現場チャット</title>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getAuth, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider,
+  createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs,
+  onSnapshot, query, orderBy, limit, serverTimestamp, updateDoc,
+  deleteDoc, where, arrayUnion }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCVk2miG5TK1ffTofXLh0hHgeSbOvmIgZ8",
+  authDomain: "kensetsu-nippo-842a2.firebaseapp.com",
+  projectId: "kensetsu-nippo-842a2",
+  storageBucket: "kensetsu-nippo-842a2.firebasestorage.app",
+  messagingSenderId: "702880974315",
+  appId: "1:702880974315:web:985321dc9180046629c5ae"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const googleProvider = new GoogleAuthProvider();
+
+window.__fb = {
+  auth, db, googleProvider,
+  signInWithEmailAndPassword, signInWithPopup, createUserWithEmailAndPassword,
+  signOut, onAuthStateChanged, updateProfile, GoogleAuthProvider,
+  collection, doc, addDoc, setDoc, getDoc, getDocs,
+  onSnapshot, query, orderBy, limit, serverTimestamp, updateDoc,
+  deleteDoc, where, arrayUnion
+};
+</script>
+
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bm:#1565C0;--bd:#0D47A1;--bmi:#1976D2;--bl:#42A5F5;--bp:#BBDEFB;--bg:#E3F2FD;
+  --g:#2E7D32;--gl:#43A047;--r:#C62828;--o:#E65100;
+  --g1:#F5F5F5;--g2:#EEEEEE;--g3:#E0E0E0;--g4:#BDBDBD;--g6:#757575;--g8:#424242;--g9:#212121;
+  --bme:#DCF8C6;--bme-d:#1E3A2F;--bot:#FFFFFF;--bot-d:#2D2D2D;
+  --bgc:#ECE5DD;--bgc-d:#1A1A2E;
+  --font:'Hiragino Sans','Meiryo',sans-serif;
+  --sb:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%;overflow:hidden;font-family:var(--font);background:#1565C0;}
+body.dark{--g1:#2D2D2D;--g2:#3D3D3D;--g3:#4D4D4D;--g4:#5D5D5D;--g6:#AAAAAA;--g8:#DDDDDD;--g9:#EEEEEE;background:#0D1117;}
+
+.screen{display:none;position:fixed;inset:0;flex-direction:column;}
+.screen.active{display:flex;}
+
+/* ===== LOGIN ===== */
+#loginScreen{background:linear-gradient(160deg,#0D47A1,#1565C0,#1976D2);align-items:center;justify-content:center;padding:20px;}
+.lwrap{width:min(420px,100%);animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}
+.llogo{text-align:center;margin-bottom:24px;}
+.llogo .ico{font-size:50px;display:block;margin-bottom:8px;}
+.llogo h1{color:#fff;font-size:22px;font-weight:700;}
+.llogo p{color:rgba(255,255,255,.7);font-size:13px;margin-top:4px;}
+.lcard{background:#fff;border-radius:20px;padding:24px 20px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.ltabs{display:flex;margin-bottom:18px;background:var(--g1);border-radius:10px;padding:3px;}
+.ltab{flex:1;padding:9px;border:none;background:transparent;border-radius:8px;font-size:13px;font-weight:600;color:var(--g6);cursor:pointer;transition:all .2s;}
+.ltab.active{background:#fff;color:var(--bm);box-shadow:0 2px 8px rgba(0,0,0,.1);}
+.lg{margin-bottom:13px;}
+.lg label{display:block;font-size:12px;font-weight:700;color:var(--g8);margin-bottom:4px;}
+.lg input{width:100%;padding:12px 13px;border:2px solid var(--g3);border-radius:10px;font-size:16px;outline:none;transition:border-color .2s;}
+.lg input:focus{border-color:var(--bm);}
+.btn-google{width:100%;padding:12px;background:#fff;border:2px solid var(--g3);border-radius:10px;font-size:14px;font-weight:600;color:var(--g8);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px;}
+.gi{width:20px;height:20px;}
+.btn-primary{width:100%;padding:13px;background:var(--bm);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;}
+.divider{display:flex;align-items:center;gap:10px;margin:12px 0;color:var(--g4);font-size:12px;}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--g3);}
+.lerr{color:var(--r);font-size:12px;text-align:center;margin-top:8px;min-height:16px;}
+
+/* ===== MAIN (Tab Layout) ===== */
+#mainScreen{background:var(--g1);}
+.main-header{background:var(--bm);color:#fff;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.2);}
+.main-header h1{font-size:17px;font-weight:700;}
+.hbtns{display:flex;gap:6px;}
+.ibtn{background:rgba(255,255,255,.15);border:none;color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;cursor:pointer;}
+.ibtn:hover{background:rgba(255,255,255,.3);}
+
+/* Tab bar */
+.tab-bar{display:flex;background:#fff;border-bottom:1px solid var(--g3);flex-shrink:0;}
+.tab-btn{flex:1;padding:10px 4px;border:none;background:transparent;font-size:12px;font-weight:600;color:var(--g6);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;border-bottom:3px solid transparent;transition:all .2s;position:relative;}
+.tab-btn.active{color:var(--bm);border-bottom-color:var(--bm);}
+.tab-btn .ticon{font-size:20px;}
+.tab-content{flex:1;overflow:hidden;display:none;flex-direction:column;}
+.tab-content.active{display:flex;}
+.unread-dot{position:absolute;top:4px;right:calc(50% - 16px);background:var(--r);color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px;}
+
+/* Search bar */
+.sbar{padding:8px 12px;background:#fff;border-bottom:1px solid var(--g3);flex-shrink:0;}
+.sbar-wrap{position:relative;}
+.sbar-wrap::before{content:'🔍';position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none;}
+.sbar input{width:100%;padding:8px 12px 8px 34px;border:1.5px solid var(--g3);border-radius:20px;font-size:14px;outline:none;background:var(--g1);}
+
+/* Room list */
+.list-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.list-section{padding:6px 12px 3px;font-size:11px;font-weight:700;color:var(--g6);letter-spacing:.5px;background:var(--g1);}
+.list-item{display:flex;align-items:center;gap:11px;padding:11px 14px;background:#fff;border-bottom:1px solid var(--g2);cursor:pointer;transition:background .15s;position:relative;}
+.list-item:active{background:var(--bg);}
+.list-icon{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;overflow:hidden;}
+.list-icon img{width:100%;height:100%;object-fit:cover;}
+.list-info{flex:1;min-width:0;}
+.list-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
+.list-name{font-size:14px;font-weight:700;color:var(--g9);}
+.list-time{font-size:11px;color:var(--g6);}
+.list-last{font-size:12px;color:var(--g6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ubadge{background:var(--r);color:#fff;font-size:10px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px;flex-shrink:0;}
+.online-dot{width:10px;height:10px;border-radius:50%;background:#4CAF50;border:2px solid #fff;position:absolute;bottom:12px;left:46px;}
+.offline-dot{width:10px;height:10px;border-radius:50%;background:var(--g4);border:2px solid #fff;position:absolute;bottom:12px;left:46px;}
+.fab{position:fixed;bottom:calc(70px + var(--sb));right:16px;width:52px;height:52px;border-radius:50%;background:var(--bm);color:#fff;border:none;font-size:24px;cursor:pointer;box-shadow:0 4px 16px rgba(21,101,192,.4);display:flex;align-items:center;justify-content:center;z-index:10;}
+.fab:active{transform:scale(.9);}
+
+/* ===== CHAT ===== */
+#chatScreen{background:var(--bgc);}
+body.dark #chatScreen{background:var(--bgc-d);}
+.chat-header{background:var(--bm);color:#fff;padding:10px 12px;display:flex;align-items:center;gap:9px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.2);}
+.back-btn{background:none;border:none;color:#fff;font-size:24px;cursor:pointer;padding:2px;line-height:1;}
+.chinfo{flex:1;min-width:0;display:flex;align-items:center;gap:9px;}
+.ch-avatar{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0;overflow:hidden;}
+.ch-avatar img{width:100%;height:100%;object-fit:cover;}
+.ch-text{flex:1;min-width:0;}
+.ch-name{font-size:15px;font-weight:700;}
+.ch-status{font-size:11px;opacity:.8;}
+.chat-msgs{flex:1;overflow-y:auto;padding:10px 8px;-webkit-overflow-scrolling:touch;}
+.date-div{text-align:center;margin:12px 0;}
+.date-div span{background:rgba(0,0,0,.28);color:#fff;font-size:11px;padding:4px 12px;border-radius:12px;}
+.mrow{display:flex;align-items:flex-end;gap:6px;margin-bottom:6px;}
+.mrow.me{flex-direction:row-reverse;}
+.mav{width:28px;height:28px;border-radius:50%;background:var(--bl);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;overflow:hidden;}
+.mav img{width:100%;height:100%;object-fit:cover;}
+.mbody{max-width:76%;display:flex;flex-direction:column;}
+.mrow.me .mbody{align-items:flex-end;}
+.mname{font-size:10px;color:var(--g6);margin-bottom:2px;padding:0 3px;}
+.bubble{padding:9px 12px;border-radius:18px;font-size:14px;line-height:1.5;word-break:break-word;box-shadow:0 1px 2px rgba(0,0,0,.1);position:relative;}
+.bubble.other{background:var(--bot);border-radius:18px 18px 18px 4px;color:var(--g9);}
+.bubble.me{background:var(--bme);border-radius:18px 18px 4px 18px;color:#1a3a1a;}
+.bubble img{max-width:200px;max-height:200px;border-radius:10px;cursor:pointer;display:block;}
+.mmeta{display:flex;align-items:center;gap:4px;margin-top:2px;padding:0 3px;}
+.mtime{font-size:10px;color:var(--g6);}
+.mread{font-size:10px;color:var(--bl);}
+.bubble .macts{display:none;position:absolute;top:-34px;right:0;background:#fff;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.2);overflow:hidden;z-index:10;white-space:nowrap;}
+.bubble:active .macts,.bubble:hover .macts{display:flex;}
+.mact{padding:7px 10px;border:none;background:none;font-size:12px;cursor:pointer;color:var(--g8);}
+.mact.del{color:var(--r);}
+.mention{color:var(--bm);font-weight:700;}
+
+/* Input */
+.cinput-wrap{background:#fff;border-top:1px solid var(--g3);padding:7px 8px;padding-bottom:calc(7px + var(--sb));flex-shrink:0;}
+.irow{display:flex;align-items:flex-end;gap:6px;}
+.iacts{display:flex;gap:3px;}
+.iact{width:36px;height:36px;border:none;background:transparent;color:var(--g6);font-size:20px;cursor:pointer;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+.iact:hover{background:var(--g2);}
+.ibox{flex:1;display:flex;align-items:flex-end;background:var(--g1);border:1.5px solid var(--g3);border-radius:20px;padding:7px 12px;gap:6px;min-height:40px;}
+.cinput{flex:1;border:none;background:transparent;outline:none;font-size:14px;resize:none;max-height:110px;line-height:1.5;font-family:var(--font);}
+.sbtn{width:40px;height:40px;border-radius:50%;background:var(--bm);color:#fff;border:none;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(21,101,192,.3);}
+.sbtn:disabled{background:var(--g4);box-shadow:none;cursor:default;}
+.img-prev-row{display:none;padding:5px 0;gap:6px;flex-wrap:wrap;}
+.img-prev-row.show{display:flex;}
+.ip{position:relative;}
+.ip img{width:58px;height:58px;object-fit:cover;border-radius:8px;}
+.ip-rm{position:absolute;top:-5px;right:-5px;width:18px;height:18px;border-radius:50%;background:var(--r);color:#fff;border:none;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.mention-list{background:#fff;border:1px solid var(--g3);border-radius:10px;max-height:140px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.1);margin:0 8px 3px;}
+.mitem{padding:9px 13px;display:flex;align-items:center;gap:9px;cursor:pointer;font-size:13px;}
+.mitem:active{background:var(--bg);}
+
+/* MODALS */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:flex-end;justify-content:center;}
+.modal-bg.open{display:flex;}
+.modal-bg.ctr{align-items:center;padding:20px;}
+.msheet{background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:82vh;overflow-y:auto;padding:20px;animation:slideUp .3s ease;}
+.msheet.ctr{border-radius:16px;animation:fadeIn .2s ease;max-width:420px;}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:none}}
+@keyframes fadeIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:none}}
+.mhandle{width:38px;height:4px;background:var(--g3);border-radius:2px;margin:0 auto 14px;}
+.mtitle{font-size:16px;font-weight:700;color:var(--g9);margin-bottom:14px;}
+.fg{margin-bottom:12px;}
+.fg label{display:block;font-size:12px;font-weight:700;color:var(--g8);margin-bottom:4px;}
+.fg input,.fg select{width:100%;padding:11px 13px;border:2px solid var(--g3);border-radius:10px;font-size:14px;outline:none;transition:border-color .2s;font-family:var(--font);}
+.fg input:focus,.fg select:focus{border-color:var(--bm);}
+.rtype-btns{display:flex;gap:7px;flex-wrap:wrap;}
+.rtype-btn{padding:9px 13px;border:2px solid var(--g3);border-radius:10px;background:#fff;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;}
+.rtype-btn.active{border-color:var(--bm);background:var(--bg);color:var(--bm);}
+.brow{display:flex;gap:9px;margin-top:14px;}
+.bcnc{flex:1;padding:12px;background:var(--g2);color:var(--g8);border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;}
+.bsub{flex:2;padding:12px;background:var(--bm);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;}
+
+/* Image viewer */
+#imgViewer{display:none;position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:500;align-items:center;justify-content:center;overflow:hidden;}
+#imgViewer.open{display:flex;}
+#iv-container{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+#imgViewer img{max-width:95%;max-height:90vh;border-radius:8px;object-fit:contain;transform-origin:center center;transition:transform 0.1s ease;touch-action:none;user-select:none;}
+.iv-close{position:absolute;top:16px;right:16px;color:#fff;font-size:26px;cursor:pointer;background:rgba(255,255,255,.1);width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:10;}
+.iv-hint{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.6);font-size:12px;white-space:nowrap;}
+
+/* Toast */
+.toast{position:fixed;bottom:calc(80px + var(--sb));left:50%;transform:translateX(-50%) translateY(20px);background:var(--g9);color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;opacity:0;transition:all .3s;pointer-events:none;z-index:600;white-space:nowrap;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast.success{background:var(--g);}
+.toast.error{background:var(--r);}
+
+/* Offline */
+.offbar{display:none;background:var(--o);color:#fff;text-align:center;padding:5px;font-size:12px;font-weight:600;flex-shrink:0;}
+.offbar.show{display:block;}
+
+/* Loading */
+.loading{display:none;position:fixed;inset:0;background:var(--bm);z-index:700;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
+.loading.show{display:flex;}
+.loader{width:42px;height:42px;border:4px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading p{color:#fff;font-size:15px;font-weight:600;}
+
+/* Dark mode */
+body.dark .lcard{background:#1E1E1E;}
+body.dark .lg input{background:#2D2D2D;border-color:#3D3D3D;color:#eee;}
+body.dark .ltab.active{background:#2D2D2D;color:#42A5F5;}
+body.dark #mainScreen{background:#121212;}
+body.dark .list-section{background:#121212;}
+body.dark .list-item{background:#1E1E1E;border-color:#2D2D2D;}
+body.dark .list-name{color:#eee;}
+body.dark .list-last{color:#aaa;}
+body.dark .tab-bar{background:#1E1E1E;border-color:#2D2D2D;}
+body.dark .tab-btn.active{color:#42A5F5;}
+body.dark .sbar{background:#1E1E1E;border-color:#2D2D2D;}
+body.dark .sbar input{background:#2D2D2D;border-color:#3D3D3D;color:#eee;}
+body.dark .bubble.other{background:var(--bot-d);color:#ddd;}
+body.dark .bubble.me{background:var(--bme-d);color:#90EE90;}
+body.dark .cinput-wrap{background:#1E1E1E;border-color:#2D2D2D;}
+body.dark .ibox{background:#2D2D2D;border-color:#3D3D3D;}
+body.dark .cinput{color:#eee;}
+body.dark .msheet{background:#1E1E1E;}
+body.dark .mtitle{color:#eee;}
+body.dark .fg input,.fg select{background:#2D2D2D;border-color:#3D3D3D;color:#eee;}
+body.dark .bcnc{background:#2D2D2D;color:#aaa;}
+body.dark .mention-list{background:#1E1E1E;}
+
+/* Scrollbar */
+.chat-msgs::-webkit-scrollbar,.list-scroll::-webkit-scrollbar{width:3px;}
+.chat-msgs::-webkit-scrollbar-thumb,.list-scroll::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:2px;}
+
+@media(min-width:768px){
+  .chat-msgs{padding:14px 20%;}
+  .chat-header,.cinput-wrap{padding-left:20%;padding-right:20%;}
+}
+
+/* DM tab user list */
+.dm-empty{text-align:center;padding:40px 20px;color:var(--g6);font-size:14px;}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading show" id="loadingScreen">
+  <div class="loader"></div>
+  <p>現場チャット 起動中...</p>
+</div>
+
+<!-- LOGIN -->
+<div class="screen" id="loginScreen">
+  <div class="lwrap">
+    <div class="llogo">
+      <span class="ico">👷</span>
+      <h1>現場チャット</h1>
+      <p>Construction Chat PWA</p>
+    </div>
+    <div class="lcard">
+      <div class="ltabs">
+        <button class="ltab active" onclick="switchTab('login')">ログイン</button>
+        <button class="ltab" onclick="switchTab('register')">新規登録</button>
+      </div>
+      <button class="btn-google" onclick="loginGoogle()">
+        <svg class="gi" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Googleでログイン
+      </button>
+      <div class="divider">または</div>
+      <div id="nameGrp" style="display:none;" class="lg">
+        <label>お名前</label>
+        <input type="text" id="regName" placeholder="田中 太郎">
+      </div>
+      <div class="lg">
+        <label>メールアドレス</label>
+        <input type="email" id="authEmail" placeholder="example@company.com" autocomplete="email">
+      </div>
+      <div class="lg">
+        <label>パスワード</label>
+        <input type="password" id="authPass" placeholder="6文字以上" autocomplete="current-password">
+      </div>
+      <div class="lerr" id="loginErr"></div>
+      <button class="btn-primary" id="loginBtn" onclick="loginEmail()">🔑 ログイン</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN (Tabs) -->
+<div class="screen" id="mainScreen">
+  <div class="offbar" id="offBar1">📵 オフライン</div>
+  <div class="main-header">
+    <h1>👷 現場チャット</h1>
+    <div class="hbtns">
+      <button class="ibtn" onclick="toggleDark()" title="ダーク">🌙</button>
+      <button class="ibtn" onclick="openProfile()" title="設定">⚙️</button>
+      <button class="ibtn" onclick="doLogout()" title="ログアウト">🚪</button>
+    </div>
+  </div>
+
+  <!-- Tab Bar -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchMainTab('rooms')" id="tab-rooms">
+      <span class="ticon">💬</span>
+      <span>ルーム</span>
+    </button>
+    <button class="tab-btn" onclick="switchMainTab('dm')" id="tab-dm">
+      <span class="ticon">👤</span>
+      <span>DM</span>
+      <span class="unread-dot" id="dm-badge" style="display:none;">0</span>
+    </button>
+    <button class="tab-btn" onclick="switchMainTab('users')" id="tab-users">
+      <span class="ticon">👥</span>
+      <span>メンバー</span>
+    </button>
+  </div>
+
+  <!-- Rooms Tab -->
+  <div class="tab-content active" id="tc-rooms">
+    <div class="sbar">
+      <div class="sbar-wrap">
+        <input type="text" placeholder="ルームを検索..." oninput="filterRooms(this.value)">
+      </div>
+    </div>
+    <div class="list-scroll" id="roomList"></div>
+    <button class="fab" onclick="openCreateRoom()">＋</button>
+  </div>
+
+  <!-- DM Tab -->
+  <div class="tab-content" id="tc-dm">
+    <div class="sbar">
+      <div class="sbar-wrap">
+        <input type="text" placeholder="メンバーを検索..." oninput="filterDM(this.value)">
+      </div>
+    </div>
+    <div class="list-scroll" id="dmList">
+      <div class="dm-empty">👆 メンバータブからDMを開始できます</div>
+    </div>
+  </div>
+
+  <!-- Users Tab -->
+  <div class="tab-content" id="tc-users">
+    <div class="sbar">
+      <div class="sbar-wrap">
+        <input type="text" placeholder="メンバーを検索..." oninput="filterUsers(this.value)">
+      </div>
+    </div>
+    <div class="list-scroll" id="userList"></div>
+  </div>
+</div>
+
+<!-- CHAT SCREEN -->
+<div class="screen" id="chatScreen">
+  <div class="offbar" id="offBar2">📵 オフライン</div>
+  <div class="chat-header">
+    <button class="back-btn" onclick="goBack()">‹</button>
+    <div class="chinfo">
+      <div class="ch-avatar" id="chAvatar">💬</div>
+      <div class="ch-text">
+        <div class="ch-name" id="chName">全体チャット</div>
+        <div class="ch-status" id="chStatus"></div>
+      </div>
+    </div>
+    <button class="ibtn" onclick="openSearchModal()" title="検索">🔍</button>
+  </div>
+  <div class="chat-msgs" id="chatMsgs"></div>
+  <div class="mention-list" id="mentionList" style="display:none;"></div>
+  <div class="img-prev-row" id="imgPrev"></div>
+  <div class="cinput-wrap">
+    <div class="irow">
+      <div class="iacts">
+        <button class="iact" onclick="document.getElementById('imgInput').click()" title="画像">📷</button>
+        <button class="iact" onclick="startVoice()" id="voiceBtn" title="音声入力">🎤</button>
+      </div>
+      <div class="ibox">
+        <textarea class="cinput" id="chatInput" placeholder="メッセージを入力..." rows="1"
+          oninput="onInput(this)" onkeydown="onKD(event)"></textarea>
+      </div>
+      <button class="sbtn" id="sendBtn" onclick="sendMsg()" disabled>➤</button>
+    </div>
+    <input type="file" id="imgInput" accept="image/*" multiple style="display:none" onchange="handleImgs(this)">
+  </div>
+</div>
+
+<!-- CREATE ROOM MODAL -->
+<div class="modal-bg" id="createRoomModal">
+  <div class="msheet">
+    <div class="mhandle"></div>
+    <div class="mtitle">新しいルームを作成</div>
+    <div class="fg"><label>ルーム名</label><input type="text" id="newRoomName" placeholder="例：2号棟現場"></div>
+    <div class="fg">
+      <label>ルームタイプ</label>
+      <div class="rtype-btns">
+        <button class="rtype-btn active" data-type="general" onclick="selRT(this)">🌐 全体</button>
+        <button class="rtype-btn" data-type="site" onclick="selRT(this)">🏗️ 現場</button>
+        <button class="rtype-btn" data-type="dept" onclick="selRT(this)">👥 部署</button>
+        <button class="rtype-btn" data-type="private" onclick="selRT(this)">🔒 非公開</button>
+      </div>
+    </div>
+    <div class="fg"><label>説明（任意）</label><input type="text" id="newRoomDesc" placeholder="このルームの説明"></div>
+    <div class="brow">
+      <button class="bcnc" onclick="closeModal('createRoomModal')">キャンセル</button>
+      <button class="bsub" onclick="createRoom()">作成</button>
+    </div>
+  </div>
+</div>
+
+<!-- PROFILE MODAL -->
+<div class="modal-bg ctr" id="profileModal">
+  <div class="msheet ctr">
+    <div class="mtitle">⚙️ プロフィール</div>
+    <div class="fg"><label>表示名</label><input type="text" id="profName" placeholder="田中 太郎"></div>
+    <div class="brow">
+      <button class="bcnc" onclick="closeModal('profileModal')">キャンセル</button>
+      <button class="bsub" onclick="saveProfile()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- SEARCH MODAL -->
+<div class="modal-bg ctr" id="searchModal">
+  <div class="msheet ctr" style="max-width:480px;">
+    <div class="mtitle">🔍 メッセージ検索</div>
+    <div class="fg"><input type="text" id="searchQ" placeholder="キーワード..." oninput="searchMsgs(this.value)"></div>
+    <div id="searchResults" style="max-height:260px;overflow-y:auto;"></div>
+    <div class="brow"><button class="bcnc" onclick="closeModal('searchModal')" style="flex:1;">閉じる</button></div>
+  </div>
+</div>
+
+<!-- IMAGE VIEWER -->
+<div id="imgViewer">
+  <div class="iv-close" onclick="closeViewer()">✕</div>
+  <div id="iv-container">
+    <img id="viewerImg" src="" alt="">
+  </div>
+  <div class="iv-hint">ピンチでズーム / ダブルタップでリセット</div>
+  <div style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);">
+    <button onclick="downloadImg()" style="background:rgba(255,255,255,.2);border:2px solid rgba(255,255,255,.5);color:#fff;padding:10px 24px;border-radius:20px;font-size:14px;font-weight:700;cursor:pointer;">⬇️ ダウンロード</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== STATE =====
+const A = {
+  user: null, userDoc: null, isAdmin: false,
+  currentRoom: null, currentRoomType: null, // 'room' | 'dm'
+  rooms: [], messages: [], allUsers: [],
+  msgUnsub: null, roomUnsub: null, userUnsub: null,
+  pendingImgs: [],
+  isDark: localStorage.getItem('dark')==='1',
+  selRoomType: 'general',
+  dmRooms: [], // DM rooms cache
+  unreadCounts: {}, // roomId -> count
+};
+
+function fb(){ return window.__fb; }
+if(A.isDark) document.body.classList.add('dark');
+
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded', ()=>{
+  const upd=()=>{ const off=!navigator.onLine; document.getElementById('offBar1').classList.toggle('show',off); document.getElementById('offBar2').classList.toggle('show',off); };
+  window.addEventListener('online',()=>{ upd(); showToast('オンライン復帰','success'); });
+  window.addEventListener('offline',upd); upd();
+  // Service worker disabled
+if('serviceWorker' in navigator) { navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister())); }
+  document.querySelectorAll('.modal-bg').forEach(bg=>bg.addEventListener('click',e=>{ if(e.target===bg)bg.classList.remove('open'); }));
+
+  fb().onAuthStateChanged(fb().auth, async user=>{
+    document.getElementById('loadingScreen').classList.remove('show');
+    if(user){
+      A.user=user;
+      await loadUserDoc();
+      updateOnlineStatus(true);
+      showScr('mainScreen');
+      loadRooms();
+      loadAllUsers();
+      listenDMRooms();
+    } else {
+      A.user=null;
+      cleanupAll();
+      showScr('loginScreen');
+    }
+  });
+});
+
+async function loadUserDoc(){
+  const{db,doc,getDoc,setDoc,serverTimestamp}=fb();
+  try{
+    const snap=await getDoc(doc(db,'users',A.user.uid));
+    if(snap.exists()){ A.userDoc=snap.data(); A.isAdmin=!!snap.data().isAdmin; }
+    else{
+      const d={uid:A.user.uid,name:A.user.displayName||A.user.email.split('@')[0],email:A.user.email,photoURL:A.user.photoURL||'',isAdmin:false,online:true,lastSeen:serverTimestamp(),createdAt:serverTimestamp()};
+      await setDoc(doc(db,'users',A.user.uid),d); A.userDoc=d;
+    }
+  }catch(e){ console.error(e); }
+}
+
+async function updateOnlineStatus(online){
+  try{
+    const{db,doc,updateDoc,serverTimestamp}=fb();
+    await updateDoc(doc(db,'users',A.user.uid),{online,lastSeen:serverTimestamp()});
+  }catch(e){}
+}
+
+window.addEventListener('beforeunload',()=>{ updateOnlineStatus(false); });
+document.addEventListener('visibilitychange',()=>{ updateOnlineStatus(!document.hidden); });
+
+// ===== AUTH =====
+let curTab='login';
+function switchTab(t){
+  curTab=t;
+  document.querySelectorAll('.ltab').forEach((el,i)=>el.classList.toggle('active',(i===0&&t==='login')||(i===1&&t==='register')));
+  document.getElementById('nameGrp').style.display=t==='register'?'':'none';
+  document.getElementById('loginBtn').textContent=t==='register'?'📝 新規登録':'🔑 ログイン';
+}
+async function loginGoogle(){ try{ await fb().signInWithPopup(fb().auth,fb().googleProvider); }catch(e){ document.getElementById('loginErr').textContent='Googleログイン失敗: '+e.message; } }
+async function loginEmail(){
+  const email=document.getElementById('authEmail').value.trim(),pass=document.getElementById('authPass').value;
+  const err=document.getElementById('loginErr'); err.textContent='';
+  if(!email||!pass){err.textContent='メールとパスワードを入力してください';return;}
+  try{
+    if(curTab==='register'){
+      const name=document.getElementById('regName').value.trim();
+      if(!name){err.textContent='お名前を入力してください';return;}
+      const c=await fb().createUserWithEmailAndPassword(fb().auth,email,pass);
+      await fb().updateProfile(c.user,{displayName:name});
+    } else { await fb().signInWithEmailAndPassword(fb().auth,email,pass); }
+  }catch(e){ err.textContent=authMsg(e.code); }
+}
+function authMsg(c){ const m={'auth/user-not-found':'ユーザーが見つかりません','auth/wrong-password':'パスワードが間違っています','auth/email-already-in-use':'このメールは使用中です','auth/weak-password':'パスワードは6文字以上','auth/invalid-credential':'メールまたはパスワードが間違っています'}; return m[c]||c; }
+async function doLogout(){ if(!confirm('ログアウトしますか？'))return; updateOnlineStatus(false); cleanupAll(); await fb().signOut(fb().auth); }
+function toggleDark(){ A.isDark=!A.isDark; document.body.classList.toggle('dark',A.isDark); localStorage.setItem('dark',A.isDark?'1':'0'); }
+
+// ===== TAB SWITCHING =====
+function switchMainTab(tab){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.getElementById('tc-'+tab).classList.add('active');
+  if(tab==='users') renderUserList(A.allUsers);
+  if(tab==='dm') renderDMList();
+}
+
+// ===== ROOMS =====
+const RICONS={general:'🌐',site:'🏗️',dept:'👥',private:'🔒'};
+const RCOLORS={general:'#1565C0',site:'#2E7D32',dept:'#6A1B9A',private:'#BF360C'};
+const DEF_ROOMS=[
+  {id:'general',name:'全体チャット',type:'general',desc:'全員参加'},
+  {id:'site-1',name:'1号棟現場',type:'site',desc:'1号棟連絡'},
+  {id:'dept-workers',name:'作業員チーム',type:'dept',desc:'作業員グループ'},
+];
+
+async function loadRooms(){
+  const{db,collection,onSnapshot,query,orderBy}=fb();
+  const q=query(collection(db,'rooms'),orderBy('lastAt','desc'));
+  A.roomUnsub=onSnapshot(q,snap=>{ A.rooms=[]; snap.forEach(d=>A.rooms.push({id:d.id,...d.data()})); renderRooms(A.rooms); },err=>console.error(err));
+}
+
+function renderRooms(rooms){
+  const list=document.getElementById('roomList'); list.innerHTML='';
+  const groups={general:[],site:[],dept:[],private:[]};
+  rooms.forEach(r=>{ const t=r.type||'general'; (groups[t]||groups.general).push(r); });
+  const labels={general:'全体',site:'現場別',dept:'部署別',private:'非公開'};
+  Object.entries(groups).forEach(([type,rms])=>{
+    if(!rms.length)return;
+    const sec=document.createElement('div'); sec.className='list-section'; sec.textContent=labels[type]; list.appendChild(sec);
+    rms.forEach(r=>{
+      const div=document.createElement('div'); div.className='list-item';
+      const ic=RICONS[r.type]||'💬', col=RCOLORS[r.type]||'#1565C0';
+      const last=r.lastMessage?esc(r.lastMessage).substring(0,28):'メッセージなし';
+      const time=r.lastAt?fmtTime(r.lastAt.toDate?r.lastAt.toDate():new Date(r.lastAt)):'';
+      const delBtn=A.isAdmin||r.createdBy===A.user?.uid?`<button onclick="event.stopPropagation();delRoom('${r.id}','${esc(r.name)}')" style="background:none;border:none;color:#C62828;font-size:20px;cursor:pointer;padding:8px;flex-shrink:0;">🗑️</button>`:'';
+      div.innerHTML=`<div class="list-icon" style="background:${col}20;cursor:pointer;">${ic}</div><div class="list-info" style="cursor:pointer;"><div class="list-top"><span class="list-name">${esc(r.name)}</span><span class="list-time">${time}</span></div><div class="list-last">${last}</div></div>${delBtn}`;
+      div.querySelector('.list-icon').onclick=()=>openRoom(r,'room');
+      div.querySelector('.list-info').onclick=()=>openRoom(r,'room');
+      list.appendChild(div);
+    });
+  });
+}
+function filterRooms(q){ renderRooms(q?A.rooms.filter(r=>r.name.toLowerCase().includes(q.toLowerCase())):A.rooms); }
+function selRT(btn){ document.querySelectorAll('.rtype-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); A.selRoomType=btn.dataset.type; }
+async function createRoom(){
+  const name=document.getElementById('newRoomName').value.trim(), desc=document.getElementById('newRoomDesc').value.trim();
+  if(!name){showToast('ルーム名を入力してください','error');return;}
+  try{ const{db,collection,addDoc,serverTimestamp}=fb(); await addDoc(collection(db,'rooms'),{name,desc,type:A.selRoomType,createdBy:A.user.uid,createdAt:serverTimestamp(),lastMessage:'',lastAt:serverTimestamp(),memberCount:1}); closeModal('createRoomModal'); document.getElementById('newRoomName').value=''; document.getElementById('newRoomDesc').value=''; showToast(`「${name}」を作成しました`,'success'); }
+  catch(e){ showToast('作成失敗: '+e.message,'error'); }
+}
+function openCreateRoom(){ document.getElementById('createRoomModal').classList.add('open'); }
+
+async function delRoom(roomId, roomName){
+  if(!confirm(`「${roomName}」を削除しますか？\nメッセージも全て削除されます。`))return;
+  try{
+    const{db,doc,deleteDoc,collection,getDocs}=fb();
+    // Delete all messages first
+    const msgs=await getDocs(collection(db,'rooms',roomId,'messages'));
+    for(const m of msgs.docs){ await deleteDoc(doc(db,'rooms',roomId,'messages',m.id)); }
+    // Delete room
+    await deleteDoc(doc(db,'rooms',roomId));
+    showToast(`「${roomName}」を削除しました`,'success');
+  }catch(e){ showToast('削除失敗: '+e.message,'error'); }
+}
+
+// ===== USERS =====
+async function loadAllUsers(){
+  const{db,collection,onSnapshot}=fb();
+  A.userUnsub=onSnapshot(collection(db,'users'),snap=>{
+    A.allUsers=[];
+    snap.forEach(d=>{ if(d.id!==A.user.uid) A.allUsers.push({uid:d.id,...d.data()}); });
+    A.allUsers.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    // Re-render if users tab is active
+    if(document.getElementById('tab-users').classList.contains('active')) renderUserList(A.allUsers);
+  });
+}
+
+function renderUserList(users){
+  const list=document.getElementById('userList'); list.innerHTML='';
+  if(!users.length){ list.innerHTML='<div class="dm-empty">メンバーが見つかりません</div>'; return; }
+  users.forEach(u=>{
+    const div=document.createElement('div'); div.className='list-item';
+    const av=u.photoURL?`<img src="${u.photoURL}" alt="">`:(u.name||'?').charAt(0);
+    const isOnline=!!u.online;
+    div.innerHTML=`
+      <div class="list-icon" style="background:${isOnline?'#E8F5E9':'#F5F5F5'};">
+        ${av}
+        <div class="${isOnline?'online-dot':'offline-dot'}"></div>
+      </div>
+      <div class="list-info">
+        <div class="list-top">
+          <span class="list-name">${esc(u.name||u.email)}</span>
+          <span class="list-time" style="color:${isOnline?'#4CAF50':'#9E9E9E'};">${isOnline?'オンライン':'オフライン'}</span>
+        </div>
+        <div class="list-last">${esc(u.email||'')}</div>
+      </div>`;
+    div.onclick=()=>openDM(u);
+    list.appendChild(div);
+  });
+}
+function filterUsers(q){ renderUserList(q?A.allUsers.filter(u=>(u.name||'').toLowerCase().includes(q.toLowerCase())||( u.email||'').toLowerCase().includes(q.toLowerCase())):A.allUsers); }
+
+// ===== DM =====
+function getDMRoomId(uid1, uid2){ return [uid1,uid2].sort().join('_dm_'); }
+
+async function openDM(targetUser){
+  const dmId=getDMRoomId(A.user.uid, targetUser.uid);
+  const{db,doc,setDoc,serverTimestamp,getDoc}=fb();
+  // Create DM room if not exists
+  try{
+    const ref=doc(db,'dms',dmId);
+    const snap=await getDoc(ref);
+    if(!snap.exists()){
+      await setDoc(ref,{
+        participants:[A.user.uid,targetUser.uid],
+        names:{[A.user.uid]:A.userDoc?.name||A.user.email,[targetUser.uid]:targetUser.name||targetUser.email},
+        photos:{[A.user.uid]:A.user.photoURL||'',[targetUser.uid]:targetUser.photoURL||''},
+        createdAt:serverTimestamp(), lastMessage:'', lastAt:serverTimestamp()
+      });
+    }
+  }catch(e){ console.error(e); }
+
+  // Open chat
+  const room={id:dmId,name:targetUser.name||targetUser.email,type:'dm',targetUser};
+  openRoom(room,'dm');
+  // Switch to DM tab
+  switchMainTab('dm');
+}
+
+function listenDMRooms(){
+  const{db,collection,query,where,onSnapshot,orderBy}=fb();
+  const q=query(collection(db,'dms'),where('participants','array-contains',A.user.uid));
+  onSnapshot(q,snap=>{
+    A.dmRooms=[];
+    snap.forEach(d=>A.dmRooms.push({id:d.id,...d.data()}));
+    A.dmRooms.sort((a,b)=>{
+      const at=a.lastAt?.toDate?a.lastAt.toDate():new Date(0);
+      const bt=b.lastAt?.toDate?b.lastAt.toDate():new Date(0);
+      return bt-at;
+    });
+    renderDMList();
+  },err=>console.error(err));
+}
+
+function renderDMList(){
+  const list=document.getElementById('dmList'); list.innerHTML='';
+  if(!A.dmRooms.length){ list.innerHTML='<div class="dm-empty">👆 メンバータブからDMを開始できます</div>'; return; }
+  A.dmRooms.forEach(dm=>{
+    const otherUid=dm.participants?.find(p=>p!==A.user.uid);
+    if(!otherUid)return;
+    const otherName=dm.names?.[otherUid]||'不明';
+    const otherPhoto=dm.photos?.[otherUid]||'';
+    const otherUser=A.allUsers.find(u=>u.uid===otherUid);
+    const isOnline=!!otherUser?.online;
+    const last=dm.lastMessage?esc(dm.lastMessage).substring(0,28):'DMを開始';
+    const time=dm.lastAt?fmtTime(dm.lastAt.toDate?dm.lastAt.toDate():new Date(dm.lastAt)):'';
+    const div=document.createElement('div'); div.className='list-item';
+    const av=otherPhoto?`<img src="${otherPhoto}" alt="">`:(otherName||'?').charAt(0);
+    div.innerHTML=`
+      <div class="list-icon" style="background:${isOnline?'#E8F5E9':'#F5F5F5'};position:relative;">
+        ${av}
+        <div class="${isOnline?'online-dot':'offline-dot'}"></div>
+      </div>
+      <div class="list-info">
+        <div class="list-top"><span class="list-name">${esc(otherName)}</span><span class="list-time">${time}</span></div>
+        <div class="list-last">${last}</div>
+      </div>`;
+    div.onclick=()=>{
+      const targetUser={uid:otherUid,name:otherName,photoURL:otherPhoto};
+      const room={id:dm.id,name:otherName,type:'dm',targetUser};
+      openRoom(room,'dm');
+    };
+    list.appendChild(div);
+  });
+}
+function filterDM(q){ /* search within dmRooms */ }
+
+// ===== OPEN CHAT =====
+function openRoom(room, type){
+  A.currentRoom=room; A.currentRoomType=type; A.messages=[];
+  const isOnline=room.targetUser?!!A.allUsers.find(u=>u.uid===room.targetUser?.uid)?.online:false;
+
+  // Header avatar
+  const avEl=document.getElementById('chAvatar');
+  if(room.targetUser?.photoURL){ avEl.innerHTML=`<img src="${room.targetUser.photoURL}" alt="">`; }
+  else if(type==='dm'){ avEl.textContent=(room.name||'?').charAt(0); }
+  else{ avEl.textContent=RICONS[room.type]||'💬'; }
+
+  document.getElementById('chName').textContent=room.name;
+  document.getElementById('chStatus').textContent=type==='dm'?(isOnline?'🟢 オンライン':'⚫ オフライン'):(RICONS[room.type]||'💬')+' '+(room.desc||'');
+  showScr('chatScreen');
+  document.getElementById('chatMsgs').innerHTML='';
+  if(A.msgUnsub){A.msgUnsub();A.msgUnsub=null;}
+  listenMsgs(room.id, type);
+}
+
+function goBack(){
+  if(A.msgUnsub){A.msgUnsub();A.msgUnsub=null;}
+  A.currentRoom=null;
+  showScr('mainScreen');
+}
+
+// ===== MESSAGES =====
+function getMsgCollection(roomId, type){
+  const{db,collection}=fb();
+  if(type==='dm') return collection(db,'dms',roomId,'messages');
+  return collection(db,'rooms',roomId,'messages');
+}
+
+function listenMsgs(roomId, type){
+  const{query,orderBy,limit,onSnapshot}=fb();
+  const col=getMsgCollection(roomId,type);
+  const q=query(col,orderBy('createdAt','asc'),limit(100));
+  A.msgUnsub=onSnapshot(q,snap=>{
+    const c=document.getElementById('chatMsgs');
+    const atBot=c.scrollHeight-c.scrollTop-c.clientHeight<80;
+    snap.docChanges().forEach(ch=>{
+      if(ch.type==='added'){ const m={id:ch.doc.id,...ch.doc.data()}; A.messages.push(m); appendMsg(m); markRead(roomId,m.id,type); }
+      else if(ch.type==='modified'){ const m={id:ch.doc.id,...ch.doc.data()}; const i=A.messages.findIndex(x=>x.id===m.id); if(i>=0)A.messages[i]=m; updateMsgEl(m); }
+      else if(ch.type==='removed'){ const el=document.getElementById('m-'+ch.doc.id); if(el)el.remove(); }
+    });
+    if(atBot) scrollBot();
+  },err=>console.error(err));
+}
+
+async function markRead(rid,mid,type){
+  try{ const{doc,updateDoc,arrayUnion}=fb(); const col=type==='dm'?`dms/${rid}/messages`:`rooms/${rid}/messages`; await updateDoc(fb().doc(fb().db,col.split('/').slice(0,-1).join('/'),mid.split('/').slice(-1)[0]),{readBy:arrayUnion(A.user.uid)}); }catch(e){}
+}
+
+function appendMsg(msg){
+  const c=document.getElementById('chatMsgs');
+  const d=msg.createdAt?.toDate?msg.createdAt.toDate():new Date();
+  const dk=d.toDateString();
+  if(!c.querySelector(`[data-date="${dk}"]`)){
+    const dv=document.createElement('div'); dv.className='date-div'; dv.dataset.date=dk;
+    dv.innerHTML=`<span>${fmtDate(d)}</span>`; c.appendChild(dv);
+  }
+  const isMe=msg.uid===A.user?.uid;
+  const row=document.createElement('div'); row.className='mrow'+(isMe?' me':''); row.id='m-'+msg.id;
+  const name=esc(msg.name||'不明');
+  const avContent=msg.photoURL?`<img src="${msg.photoURL}" alt="">`:(msg.name||'?').charAt(0);
+  const time=msg.createdAt?.toDate?fmtTime(msg.createdAt.toDate()):'';
+  const read=isMe&&msg.readBy&&msg.readBy.length>1?`<span class="mread">既読${msg.readBy.length-1}</span>`:'';
+  const canDel=isMe||A.isAdmin;
+  const delBtn=canDel?`<button class="mact del" onclick="delMsg('${msg.id}')">削除</button>`:'';
+  let content='';
+  if(msg.imageData){ content=`<img src="${msg.imageData}" alt="画像" onclick="openViewer('${msg.imageData.replace(/'/g,"\\'")}')">`;  }
+  else{ content=fmtText(msg.text||''); }
+  row.innerHTML=`${!isMe?`<div class="mav">${avContent}</div>`:''}<div class="mbody">${!isMe?`<div class="mname">${name}</div>`:''}<div class="bubble ${isMe?'me':'other'}">${content}<div class="macts"><button class="mact" onclick="replyTo('${msg.id}')">返信</button>${delBtn}</div></div><div class="mmeta"><span class="mtime">${time}</span>${read}</div></div>${isMe?`<div class="mav">${avContent}</div>`:''}`;
+  c.appendChild(row);
+}
+
+function updateMsgEl(msg){
+  const el=document.getElementById('m-'+msg.id); if(!el)return;
+  if(msg.uid===A.user?.uid){
+    const read=msg.readBy&&msg.readBy.length>1?`<span class="mread">既読${msg.readBy.length-1}</span>`:'';
+    const meta=el.querySelector('.mmeta'); if(meta){ const t=msg.createdAt?.toDate?fmtTime(msg.createdAt.toDate()):''; meta.innerHTML=`<span class="mtime">${t}</span>${read}`; }
+  }
+}
+
+function fmtText(t){ let s=esc(t); s=s.replace(/@(\S+)/g,'<span class="mention">@$1</span>'); s=s.replace(/\n/g,'<br>'); return s; }
+
+// ===== SEND =====
+let sending=false;
+async function sendMsg(){
+  if(sending)return;
+  const inp=document.getElementById('chatInput'), text=inp.value.trim();
+  if(!text&&A.pendingImgs.length===0)return;
+  if(!A.currentRoom)return;
+  sending=true; document.getElementById('sendBtn').disabled=true;
+  try{
+    const{db,addDoc,serverTimestamp,doc,updateDoc}=fb();
+    const rid=A.currentRoom.id, type=A.currentRoomType;
+    const col=getMsgCollection(rid,type);
+    const updateRef=type==='dm'?fb().doc(db,'dms',rid):fb().doc(db,'rooms',rid);
+
+    // Send images
+    for(const img of A.pendingImgs){
+      await addDoc(col,{uid:A.user.uid,name:A.userDoc?.name||A.user.displayName||A.user.email,photoURL:A.user.photoURL||'',text:'',imageData:img.data,createdAt:serverTimestamp(),readBy:[A.user.uid]});
+    }
+    A.pendingImgs=[]; document.getElementById('imgPrev').innerHTML=''; document.getElementById('imgPrev').classList.remove('show');
+
+    // Send text
+    if(text){
+      await addDoc(col,{uid:A.user.uid,name:A.userDoc?.name||A.user.displayName||A.user.email,photoURL:A.user.photoURL||'',text,imageData:'',createdAt:serverTimestamp(),readBy:[A.user.uid]});
+      inp.value=''; inp.style.height='auto';
+    }
+
+    await updateDoc(updateRef,{lastMessage:text||'📷 画像',lastAt:serverTimestamp()});
+    document.getElementById('sendBtn').disabled=true; scrollBot();
+  }catch(e){ showToast('送信失敗: '+e.message,'error'); }
+  sending=false;
+}
+
+async function delMsg(msgId){
+  if(!confirm('このメッセージを削除しますか？'))return;
+  try{ const{doc,deleteDoc}=fb(); const rid=A.currentRoom.id,type=A.currentRoomType; const colPath=type==='dm'?`dms/${rid}/messages/${msgId}`:`rooms/${rid}/messages/${msgId}`; await deleteDoc(fb().doc(fb().db,...colPath.split('/'))); showToast('削除しました'); }
+  catch(e){ showToast('削除失敗','error'); }
+}
+
+// ===== IMAGE COMPRESS =====
+async function compressImage(file, maxSizeKB=800){
+  return new Promise((resolve)=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        const canvas=document.createElement('canvas');
+        let w=img.width, h=img.height;
+        // Max dimension 1200px
+        const maxDim=1200;
+        if(w>maxDim||h>maxDim){
+          if(w>h){h=Math.round(h*maxDim/w);w=maxDim;}
+          else{w=Math.round(w*maxDim/h);h=maxDim;}
+        }
+        canvas.width=w; canvas.height=h;
+        const ctx=canvas.getContext('2d');
+        ctx.drawImage(img,0,0,w,h);
+        // Reduce quality until under maxSizeKB
+        let quality=0.85;
+        let data=canvas.toDataURL('image/jpeg',quality);
+        while(data.length>maxSizeKB*1024*1.37&&quality>0.3){
+          quality-=0.1;
+          data=canvas.toDataURL('image/jpeg',quality);
+        }
+        resolve(data);
+      };
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleImgs(input){
+  const files=Array.from(input.files);
+  const prev=document.getElementById('imgPrev');
+  prev.classList.add('show');
+  showToast('画像を圧縮中...');
+  for(const f of files){
+    try{
+      const compressed=await compressImage(f);
+      const sizekb=Math.round(compressed.length*0.75/1024);
+      const w=document.createElement('div'); w.className='ip';
+      const idx=A.pendingImgs.length;
+      w.innerHTML=`<img src="${compressed}" alt=""><button class="ip-rm" onclick="rmImg(${idx})">×</button>`;
+      prev.appendChild(w);
+      A.pendingImgs.push({data:compressed,name:f.name});
+      document.getElementById('sendBtn').disabled=false;
+      showToast(`圧縮完了 ${sizekb}KB`,'success');
+    }catch(e){ showToast('画像処理エラー','error'); }
+  }
+  input.value='';
+}
+
+function rmImg(i){ A.pendingImgs.splice(i,1); const p=document.getElementById('imgPrev'); p.innerHTML=''; A.pendingImgs.forEach((img,j)=>{ const w=document.createElement('div'); w.className='ip'; w.innerHTML=`<img src="${img.data}" alt=""><button class="ip-rm" onclick="rmImg(${j})">×</button>`; p.appendChild(w); }); if(!A.pendingImgs.length)p.classList.remove('show'); document.getElementById('sendBtn').disabled=A.pendingImgs.length===0&&!document.getElementById('chatInput').value.trim(); }
+
+// ===== INPUT =====
+function onInput(el){
+  el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,110)+'px';
+  document.getElementById('sendBtn').disabled=el.value.trim()===''&&A.pendingImgs.length===0;
+  const v=el.value,la=v.lastIndexOf('@');
+  if(la>=0){ const q=v.substring(la+1); if(!q.includes(' ')){ showMentions(q); return; } }
+  hideMentions();
+}
+function onKD(e){ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();} }
+function showMentions(q){ const list=document.getElementById('mentionList'); const ms=A.allUsers.filter(u=>!q||(u.name||'').toLowerCase().includes(q.toLowerCase())); if(!ms.length){hideMentions();return;} list.style.display=''; list.innerHTML=ms.map(u=>`<div class="mitem" onclick="insertMention('${esc(u.name)}')">${(u.name||'?').charAt(0)} ${esc(u.name)}</div>`).join(''); }
+function hideMentions(){ document.getElementById('mentionList').style.display='none'; }
+function insertMention(name){ const inp=document.getElementById('chatInput'); const v=inp.value; inp.value=v.substring(0,v.lastIndexOf('@'))+'@'+name+' '; hideMentions(); inp.focus(); onInput(inp); }
+
+function startVoice(){
+  if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){showToast('音声入力非対応','error');return;}
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition,rec=new SR(); rec.lang='ja-JP';
+  rec.onstart=()=>{document.getElementById('voiceBtn').textContent='🔴';showToast('音声入力中...');};
+  rec.onresult=e=>{document.getElementById('chatInput').value+=e.results[0][0].transcript;onInput(document.getElementById('chatInput'));};
+  rec.onend=()=>document.getElementById('voiceBtn').textContent='🎤';
+  rec.start();
+}
+function replyTo(mid){ const m=A.messages.find(x=>x.id===mid); if(!m)return; const inp=document.getElementById('chatInput'); inp.value=`@${m.name} `; inp.focus(); onInput(inp); }
+
+// ===== PROFILE =====
+function openProfile(){ document.getElementById('profName').value=A.userDoc?.name||''; document.getElementById('profileModal').classList.add('open'); }
+async function saveProfile(){
+  const name=document.getElementById('profName').value.trim(); if(!name){showToast('名前を入力してください','error');return;}
+  try{ const{db,doc,updateDoc}=fb(); await fb().updateProfile(fb().auth.currentUser,{displayName:name}); await updateDoc(doc(db,'users',A.user.uid),{name}); if(A.userDoc)A.userDoc.name=name; closeModal('profileModal'); showToast('更新しました','success'); }
+  catch(e){ showToast('更新失敗','error'); }
+}
+
+// ===== SEARCH =====
+function openSearchModal(){ document.getElementById('searchQ').value=''; document.getElementById('searchResults').innerHTML=''; document.getElementById('searchModal').classList.add('open'); }
+function searchMsgs(q){ if(!q){document.getElementById('searchResults').innerHTML='';return;} const res=A.messages.filter(m=>(m.text||'').toLowerCase().includes(q.toLowerCase())); document.getElementById('searchResults').innerHTML=res.length?res.slice(-20).map(m=>`<div style="padding:9px;border-bottom:1px solid var(--g3);"><div style="font-size:11px;color:var(--g6);margin-bottom:3px;">${esc(m.name)} · ${m.createdAt?.toDate?fmtTime(m.createdAt.toDate()):''}</div><div style="font-size:13px;">${esc(m.text||'').replace(new RegExp(q,'gi'),t=>`<mark>${t}</mark>`)}</div></div>`).join(''):'<p style="text-align:center;color:var(--g6);padding:18px;">見つかりませんでした</p>'; }
+
+// ===== VIEWER with PINCH ZOOM =====
+let ivScale=1, ivLastScale=1, ivStartDist=0, ivDragging=false;
+let ivStartX=0, ivStartY=0, ivTransX=0, ivTransY=0, ivLastX=0, ivLastY=0;
+
+function openViewer(url){
+  const img=document.getElementById('viewerImg');
+  img.src=url; ivScale=1; ivLastScale=1; ivTransX=0; ivTransY=0;
+  img.style.transform='scale(1) translate(0px,0px)';
+  document.getElementById('imgViewer').classList.add('open');
+  setupViewerTouch(img);
+}
+function closeViewer(){
+  document.getElementById('imgViewer').classList.remove('open');
+}
+function downloadImg(){
+  const img=document.getElementById('viewerImg');
+  const a=document.createElement('a');
+  a.href=img.src;
+  a.download='chat-image-'+Date.now()+'.jpg';
+  a.click();
+}
+
+function setupViewerTouch(img){
+  let lastTap=0;
+  img.ontouchstart=e=>{
+    if(e.touches.length===2){
+      ivStartDist=Math.hypot(
+        e.touches[0].clientX-e.touches[1].clientX,
+        e.touches[0].clientY-e.touches[1].clientY
+      );
+      ivLastScale=ivScale;
+    } else if(e.touches.length===1){
+      ivDragging=true;
+      ivStartX=e.touches[0].clientX-ivTransX;
+      ivStartY=e.touches[0].clientY-ivTransY;
+    }
+    e.preventDefault();
+  };
+  img.ontouchmove=e=>{
+    if(e.touches.length===2){
+      const dist=Math.hypot(
+        e.touches[0].clientX-e.touches[1].clientX,
+        e.touches[0].clientY-e.touches[1].clientY
+      );
+      ivScale=Math.min(Math.max(ivLastScale*(dist/ivStartDist),0.5),5);
+      img.style.transform=`scale(${ivScale}) translate(${ivTransX/ivScale}px,${ivTransY/ivScale}px)`;
+    } else if(e.touches.length===1&&ivDragging&&ivScale>1){
+      ivTransX=e.touches[0].clientX-ivStartX;
+      ivTransY=e.touches[0].clientY-ivStartY;
+      img.style.transform=`scale(${ivScale}) translate(${ivTransX/ivScale}px,${ivTransY/ivScale}px)`;
+    }
+    e.preventDefault();
+  };
+  img.ontouchend=e=>{
+    ivDragging=false;
+    // ピンチ終了時はスケールを維持
+    if(e.touches.length===0&&ivLastScale!==ivScale){
+      ivLastScale=ivScale;
+    }
+    // ダブルタップでリセット
+    const now=Date.now();
+    if(now-lastTap<300){
+      ivScale=1; ivLastScale=1; ivTransX=0; ivTransY=0;
+      img.style.transform='scale(1) translate(0px,0px)';
+    }
+    lastTap=now;
+  };
+  img.ondblclick=()=>{
+    ivScale=1; ivLastScale=1; ivTransX=0; ivTransY=0;
+    img.style.transform='scale(1) translate(0px,0px)';
+  };
+}
+
+// ===== UTILS =====
+function cleanupAll(){ if(A.msgUnsub){A.msgUnsub();A.msgUnsub=null;} if(A.roomUnsub){A.roomUnsub();A.roomUnsub=null;} if(A.userUnsub){A.userUnsub();A.userUnsub=null;} }
+function showScr(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+function scrollBot(){ const el=document.getElementById('chatMsgs'); el.scrollTop=el.scrollHeight; }
+function fmtTime(d){ if(!d)return''; const now=new Date(),ms=now-d,m=Math.floor(ms/60000); if(m<1)return'たった今'; if(m<60)return`${m}分前`; if(m<1440)return`${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`; return`${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`; }
+function fmtDate(d){ const now=new Date(),diff=Math.floor((now-d)/86400000); if(diff===0)return'今日'; if(diff===1)return'昨日'; return`${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`; }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+let tt; function showToast(msg,type=''){ const el=document.getElementById('toast'); el.textContent=msg; el.className='toast show'+(type?' '+type:''); clearTimeout(tt); tt=setTimeout(()=>el.classList.remove('show'),3000); }
+</script>
+</body>
+</html>
